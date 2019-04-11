@@ -1,0 +1,54 @@
+
+Concept model was implemeted in Oracle DataModeler, you can view it by opening file logical_model.dmd in datamodeler under Logical Model tab
+(what is called logical model for this project is in Relation Models in datamodeler).
+
+First three basic entities were set:
+  items  - collection of item names the library possesses
+  copies - each item is represented with several copies
+  category - each item belongs to certain category
+  loans - this entity should represent records of renting and returning of copies
+  patrons - library clients
+  requests - entity contains requests of patrons for certain items in library
+  damages - tracks all damages made by clients to copies
+  payments - records of payments made by patrons for overdue, damaged or loss of copy
+
+The workflow is following:
+  Patron makes a request for the certain item. If any copy of that item is in stock then the record adds to the loans with start_date attribute filled with current date
+  and due date is calculated based on category of item. Upon return the condition of the copy can by changed that is recorded in condition field in loans and in copies
+  and if new condition (if it is harmful for library) is recorded in damages entity including who made that harm and to which copy. Also the date of return is updated in loans.
+  Payments contains attributes that contain references for loans that were overdue or damages that were cause and reference on patron who made the payment.
+
+Logical model is in Relation Models tab in file logical_model.dmd and is called logical_model.
+  Primary keys and foreign key constraints were added based on relation between entities from concept_model. Attributes were enchaunced and typified.
+  Also dictionaries were added to satisfy BCNF.
+
+Relational Model was transformed in DDL in file create_tables.sql. Also that file contains creation of triggers, sequences and filling tables items,patrons and dictionaries,
+and the rest of data to be processed by the system.
+
+  Now the logic of work is transferred to triggers.
+
+  How it all works:
+
+  1. You make request for a patron by inserting correct data to the table REQUESTS
+      example: insert into requests (patrin_id,items_id) values (1010,1010);
+
+  2. This fires a trigger REQUESTS_INS. It checks if there are free copies presented in library (ON SHELF -status in copies).
+      If yes it left request with pending status.
+      If no it checks if there are requests with PENDING status made by any other patron earlier.
+      If yes it left request with pending status. It doesn't proceed previous request or change it status, it depends if database will be developed further and such records may by marked for notification of patron that the copy is released.
+      If no it makes a new record in loans and set a status or request as PROCESSED.
+
+  3. When records are inserting in LOANS table the trigger LOANS_INS fires
+      It reads the allowed checkout for the category of item that patron is taking and writes DUE_DATE - the date when the copy should be returned.
+      Also it reads condition of the copy and writes to the relevant field in LOANS.
+
+  4. When patron returns a copy or he makes a renewal it updating his record in LOANS and that s when trigger LOANS_UPD fires.
+
+        On renew the system should update the field LOANS.RENEWAlS_USED (update LOANS set RENEWAlS_USED = RENEWALS_USED + 1 where id = 1051)
+          Trigger LOANS_UPD checks if the final amount of renewals doesn't exceeds allowed renewals amount for that category of item.
+          If it does DUE_DATE is not changing. If not than DUE_DATE adds number of days that are allowed for that category of item.
+
+        On return the ACTUAL_RETURN_DATE is filled. Also new condition is compared with the previous condition state which is kept in COPIES.CONDITION column.
+          If condition is changed to worse value then the record in DAMAGES table is made with information about copy and patron.
+
+        
